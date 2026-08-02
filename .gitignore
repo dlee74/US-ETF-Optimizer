@@ -8,3 +8,7 @@ __pycache__/
 # deck_automation/tests/conftest.py and its docstring for how to regenerate
 # these locally from a real deck.
 deck_automation/tests/fixtures/
+
+# Real cost-basis data (share counts, dollar book cost) — see
+# deck_automation/clients/wiley_group_private.py.example for the format.
+deck_automation/clients/wiley_group_private.py

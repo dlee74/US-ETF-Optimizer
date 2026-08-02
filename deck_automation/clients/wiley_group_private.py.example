@@ -1,0 +1,19 @@
+"""Real Wiley Group cost-basis data — copy this file to wiley_group_private.py
+(gitignored, never committed to this public repo) and fill in verified
+numbers from the client's actual TD Direct Investing statement.
+
+Source of truth: each monthly statement's "Holdings in your account" table
+already gives DRIP-adjusted Quantity + total Book Cost per ticker directly —
+no need to reconstruct from individual buy/sell/reinvestment lines. Do NOT
+use any file literally named "Trade Blotter" in the client folder as the
+source — those have consistently turned out to be pre-trade drafts/estimates
+("final share quantities must be calculated at time of trade"), not the
+executed fill. Use Clients/DJ/Investment Account Statements/*.pdf instead.
+
+Update this whenever a real trade executes (verified against the new
+statement) — this is static config, not re-derived automatically each run.
+"""
+
+COST_BASIS = {
+    # "TICKER": {"shares": 0.0, "book_cost": 0.0, "as_of": "YYYY-MM-DD", "source": "statement filename"},
+}

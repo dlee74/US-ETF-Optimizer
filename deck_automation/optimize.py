@@ -113,3 +113,53 @@ def optimize_holdings(holdings, client_config) -> OptimizedPortfolio:
         )
     new_weights = dict(zip(slsqp["weights"]["ETF"], slsqp["weights"]["Weight"]))
     return _evaluate(holdings.name, new_weights, client_config)
+
+
+def build_reoptimization_table(holdings, optimized: OptimizedPortfolio, client_config: dict) -> list[dict]:
+    """Combines current holdings + optimize_holdings()'s result + live $
+    values (position_value.py) into slide 10's exact 8-column schema:
+    Holding, Type, Current Weight, Re-Optimized Weight, Weight Δ,
+    Current $ Value, Re-Optimized $ Value, $ Change — plus a Portfolio Total
+    row, matching the real deck's formatting (percent/pp/comma-dollar
+    strings, not raw floats). Re-optimization reallocates the SAME total
+    portfolio value, it doesn't change it — Re-Optimized $ Value for a
+    ticker is (that ticker's new weight) * (this portfolio's current total)."""
+    from deck_automation.position_value import current_values
+
+    ticker_map = client_config["ticker_map"]
+    ticker_types = client_config["ticker_types"]
+    portfolio_cost_basis = {t: client_config["cost_basis"][t] for t in holdings.tickers}
+    values = current_values(portfolio_cost_basis, ticker_map)
+    total_value = sum(pv.market_value for pv in values.values())
+
+    current_weight = dict(zip(holdings.tickers, holdings.weights))
+    new_weight = dict(zip(optimized.tickers, optimized.weights))
+
+    rows = []
+    for ticker in holdings.tickers:
+        cur_w = current_weight[ticker]
+        new_w = new_weight[ticker]
+        cur_value = values[ticker].market_value
+        new_value = total_value * new_w
+        rows.append({
+            "Holding": ticker,
+            "Type": ticker_types[ticker],
+            "Current Weight": f"{cur_w:.1%}",
+            "Re-Optimized Weight": f"{new_w:.1%}",
+            "Weight Δ": f"{(new_w - cur_w) * 100:+.1f}pp",
+            "Current $ Value": f"{cur_value:,.2f}",
+            "Re-Optimized $ Value": f"{new_value:,.2f}",
+            "$ Change": f"{new_value - cur_value:+,.2f}",
+        })
+
+    rows.append({
+        "Holding": "Portfolio Total",
+        "Type": "",
+        "Current Weight": "100.0%",
+        "Re-Optimized Weight": "100.0%",
+        "Weight Δ": "—",
+        "Current $ Value": f"{total_value:,.2f}",
+        "Re-Optimized $ Value": f"{total_value:,.2f}",
+        "$ Change": "0.00",
+    })
+    return rows

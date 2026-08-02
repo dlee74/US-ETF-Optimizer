@@ -1,3 +1,16 @@
+try:
+    from .wiley_group_private import COST_BASIS
+except ImportError as e:
+    raise ImportError(
+        "deck_automation/clients/wiley_group_private.py is missing (gitignored, "
+        "contains real client cost-basis data — never committed). Copy "
+        "wiley_group_private.py.example to wiley_group_private.py and fill in "
+        "verified numbers from the client's real TD Direct Investing statement "
+        "(Clients/DJ/Investment Account Statements/*.pdf) before using "
+        "position_value.py or rebalance.py."
+    ) from e
+
+
 WILEY_GROUP = {
 
     "client_dir": r"G:\Shared drives\InvestMint Corporate Drive\Old InvestMint Corporate\Clients\DJ",
@@ -37,6 +50,20 @@ WILEY_GROUP = {
         "QHY":  "QHY.TO",
     },
 
+    # Asset-class description shown in the "Type" column — public fund info,
+    # verified against the deck's own holdings tables (slide3/slide4 of the
+    # July 2026 update).
+    "ticker_types": {
+        "HDIV": "Enhanced Dividend (Covered Call)",
+        "ZCS":  "Short Corporate Bond",
+        "XFR":  "Floating Rate Bond",
+        "RPF":  "Canadian Preferred Shares",
+        "CMR":  "Premium Money Market",
+        "HFR":  "Ultra-Short Investment Grade Bond",
+        "PFL":  "Government Floating Rate",
+        "QHY":  "US High Yield Bond (CAD-Hedged)",
+    },
+
     # Matches what was actually used by hand for this client, not
     # evaluate_custom_weights()'s own 5y default.
     "period": "3y",
@@ -49,4 +76,8 @@ WILEY_GROUP = {
     "optimizer_profile": "enhanced",
     "w_min": 0.05,
     "max_etf_weight": 0.40,
+
+    # Verified against the client's real TD Direct Investing statements —
+    # see wiley_group_private.py.example for how to regenerate/update.
+    "cost_basis": COST_BASIS,
 }

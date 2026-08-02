@@ -42,8 +42,12 @@ if str(_ROOT) not in sys.path:
 
 from deck_automation.clients import CLIENTS  # noqa: E402
 from deck_automation.extract import extract_portfolio_holdings  # noqa: E402
-from deck_automation.optimize import optimize_holdings, refresh_metrics_at_target  # noqa: E402
+from deck_automation.optimize import (  # noqa: E402
+    build_reoptimization_table, optimize_holdings, refresh_metrics_at_target,
+)
 from deck_automation.patch.package import patch_metrics_refresh  # noqa: E402
+from deck_automation.position_value import current_values  # noqa: E402
+from deck_automation.rebalance import compute_trades  # noqa: E402
 from deck_automation.render_qa import run_qa  # noqa: E402
 
 
@@ -124,19 +128,37 @@ def cmd_propose(args) -> None:
     for h in holdings:
         print(f"Re-optimizing {h.name} ...")
         optimized = optimize_holdings(h, client_config)
-        current = dict(zip(h.tickers, h.weights))
-        proposed = dict(zip(optimized.tickers, optimized.weights))
+
+        reopt_table = build_reoptimization_table(h, optimized, client_config)
 
         lines.append(f"\n## {h.slide_title}\n")
-        lines.append("| Ticker | Current | Proposed |")
-        lines.append("|---|---|---|")
-        for ticker in optimized.tickers:
-            lines.append(f"| {ticker} | {current.get(ticker, 0):.1%} | {proposed[ticker]:.1%} |")
+        lines.append("### Re-Optimized Allocation (proposed new target — not yet executed)\n")
+        lines.append("| " + " | ".join(reopt_table[0].keys()) + " |")
+        lines.append("|" + "---|" * 8)
+        for row in reopt_table:
+            lines.append("| " + " | ".join(str(v) for v in row.values()) + " |")
+
         lines.append(f"\nWindow: {optimized.window[0]} to {optimized.window[1]}\n")
         lines.append("| Metric | Value |")
         lines.append("|---|---|")
         for metric, value in optimized.metrics["Value"].items():
             lines.append(f"| {metric} | {value} |")
+
+        if h.target_weights is not None:
+            print(f"Computing rebalance-to-target trades for {h.name} ...")
+            portfolio_cost_basis = {t: client_config["cost_basis"][t] for t in h.tickers}
+            values = current_values(portfolio_cost_basis, client_config["ticker_map"])
+            trades = compute_trades(values, h.target_weights)
+
+            lines.append("\n### Rebalance to Existing Target (routine maintenance, "
+                         f"back to {h.target_weights_text.split(':', 1)[1].strip()})\n")
+            lines.append("| Ticker | Action | $ Amount | Shares Δ | Current $ Value | Target $ Value | Target Weight |")
+            lines.append("|---|---|---|---|---|---|---|")
+            for t in trades:
+                lines.append(
+                    f"| {t.ticker} | {t.action} | {t.dollar_amount:,.2f} | {t.shares_delta:+.1f} | "
+                    f"{t.current_market_value:,.2f} | {t.target_market_value:,.2f} | {t.new_weight:.1%} |"
+                )
 
     out_path = out_dir / f"{Path(args.template).stem} - proposal.md"
     out_path.write_text("\n".join(lines), encoding="utf-8")
