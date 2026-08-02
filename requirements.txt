@@ -28,8 +28,10 @@ dnspython==2.7.0      # required by pymongo to resolve mongodb+srv:// URIs; 1.16
 certifi==2025.1.31    # trusted CA bundle so the Atlas TLS handshake succeeds in the cloud venv
 python-dotenv==1.2.2
 
-# Client deck automation (deck_automation/) — read-only pptx inspection + XML surgery.
+# Client deck automation (deck_automation/) — read-only pptx inspection + XML surgery,
+# and .docx generation for the trade-blotter one-pager.
 # Windows-only rendering deps (PowerPoint COM) live in deck_automation/requirements-windows.txt,
 # not here, since this file is also installed on the Linux/Streamlit Cloud deploy path.
 python-pptx==1.0.2
+python-docx==1.2.0
 lxml==6.1.1

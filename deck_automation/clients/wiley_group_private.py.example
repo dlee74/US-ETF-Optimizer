@@ -12,8 +12,15 @@ executed fill. Use Clients/DJ/Investment Account Statements/*.pdf instead.
 
 Update this whenever a real trade executes (verified against the new
 statement) — this is static config, not re-derived automatically each run.
+
+purchase_date is the ORIGINAL trade-execution date (from the statement's
+"Activity in your account" Buy entries, not the "Holdings" section's price
+date) — used by trade_blotter.limit_price_full_exit()'s "since purchase"
+lookback window. Distinct from as_of, the statement date shares/book_cost
+were last verified against.
 """
 
 COST_BASIS = {
-    # "TICKER": {"shares": 0.0, "book_cost": 0.0, "as_of": "YYYY-MM-DD", "source": "statement filename"},
+    # "TICKER": {"shares": 0.0, "book_cost": 0.0, "as_of": "YYYY-MM-DD",
+    #            "source": "statement filename", "purchase_date": "YYYY-MM-DD"},
 }
