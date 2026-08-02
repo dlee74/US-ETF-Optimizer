@@ -23,8 +23,8 @@ from Optimizer_Class.hrp_optimization import hrp_allocate
 from Optimizer_Class.get_portfolio_metrics import get_portfolio_metrics
 
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-csv_path = BASE_DIR / "US Optimization" / "data_sourcing" / "US_Final_ETF_Data.csv"
+BASE_DIR = Path(__file__).resolve().parent
+csv_path = BASE_DIR / "data_sourcing" / "US_Final_ETF_Data.csv"
 
 # Fixed baskets. The profile name (key) selects the optimizer config — SLSQP
 # objective weights and CVXPY risk aversion — applied when allocating the basket.

@@ -1,1 +1,10 @@
 .env
+.venv/
+__pycache__/
+*.pyc
+
+# Real client data (Wiley Group's actual holdings/account/dollar figures) —
+# never commit to this public repo. Tests skip gracefully when absent; see
+# deck_automation/tests/conftest.py and its docstring for how to regenerate
+# these locally from a real deck.
+deck_automation/tests/fixtures/

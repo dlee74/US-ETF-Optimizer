@@ -1,0 +1,4 @@
+# Windows-only. Installed separately from requirements.txt so it never touches
+# the Linux/Streamlit Cloud deploy path. Used by render_qa.py for PowerPoint
+# COM automation (headless render of changed slides to PNG for visual QA).
+pywin32==312
