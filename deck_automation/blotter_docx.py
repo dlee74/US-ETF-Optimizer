@@ -16,7 +16,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 QUICK_REFERENCE_CALLOUT = (
     "Use Day limit orders only. Enter near the bid/ask midpoint. Cap adjustments at "
-    "$0.02 total. Pause and let orders expire if the spread exceeds roughly 2x its "
+    "$0.01 total. Pause and let orders expire if the spread exceeds roughly 2x its "
     "recent normal range."
 )
 
@@ -33,7 +33,7 @@ EXECUTION_PROTOCOL = [
     ("TIMING", "Preferred trading window: 10:30 a.m. to 2:00 p.m. ET. When practical, "
                 "avoid the first and final 15 minutes of the trading day."),
     ("PRICE", "Enter near the midpoint of the bid-ask spread. Do not adjust the limit "
-               "more than $0.02 in total; allowing the order to expire is generally "
+               "more than $0.01 in total; allowing the order to expire is generally "
                "preferred over chasing the price."),
     ("UNFILLED / PARTIAL", "Leave any unfilled or partially filled order active until "
                             "market close. Record partial fills and allow the remaining "

@@ -85,3 +85,38 @@ def compute_full_exit_swap(sell_position, buy_ticker: str, buy_price: float,
         target_market_value=proceeds, new_weight=proceeds / portfolio_total_value,
     )
     return sell_trade, buy_trade
+
+
+def round_to_board_lot(trade: TradeInstruction, portfolio_total: float, lot_size: int = 100) -> TradeInstruction:
+    """Round a trade's share count DOWN to the nearest board lot (TSX
+    standard: 100 shares), recomputing dollar_amount/target_market_value/
+    new_weight to stay internally consistent with the rounded share count.
+
+    A full-position exit (SELL to a 0% target) is returned UNCHANGED --
+    that's disposing of the whole position, including whatever fractional/
+    odd-lot shares exist (e.g. from DRIP reinvestment); it isn't a
+    discretionary size decision to round. Everything else (a computed BUY
+    or partial-trim SELL) rounds cleanly, since the trader is choosing how
+    much to trade, not required to move an exact existing quantity."""
+    if trade.action == "SELL" and trade.new_weight == 0:
+        return trade
+
+    price_used = trade.dollar_amount / abs(trade.shares_delta)
+    new_abs_shares = (abs(trade.shares_delta) // lot_size) * lot_size
+    if new_abs_shares == 0:
+        raise ValueError(
+            f"{trade.ticker}: {abs(trade.shares_delta):.1f} shares rounds to 0 "
+            f"at a {lot_size}-share board lot — trade too small to round."
+        )
+    sign = 1 if trade.shares_delta > 0 else -1
+    new_shares_delta = sign * new_abs_shares
+    new_dollar_amount = new_abs_shares * price_used
+    signed_amount = new_dollar_amount if trade.action == "BUY" else -new_dollar_amount
+    new_target_market_value = trade.current_market_value + signed_amount
+
+    return TradeInstruction(
+        ticker=trade.ticker, action=trade.action, dollar_amount=new_dollar_amount,
+        shares_delta=new_shares_delta, current_market_value=trade.current_market_value,
+        target_market_value=new_target_market_value,
+        new_weight=new_target_market_value / portfolio_total,
+    )

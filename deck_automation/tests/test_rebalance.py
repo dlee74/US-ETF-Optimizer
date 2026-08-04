@@ -1,5 +1,7 @@
 from deck_automation.position_value import PositionValue
-from deck_automation.rebalance import compute_full_exit_swap, compute_trades
+from deck_automation.rebalance import (
+    TradeInstruction, compute_full_exit_swap, compute_trades, round_to_board_lot,
+)
 
 
 def _pv(ticker, shares, price, book_cost=0.0):
@@ -63,3 +65,37 @@ def test_compute_full_exit_swap_other_holdings_unaffected():
     sell_trade, buy_trade = compute_full_exit_swap(
         sell_position, "ZCS", buy_price=14.0, portfolio_total_value=100_000.0)
     assert {sell_trade.ticker, buy_trade.ticker} == {"QHY", "ZCS"}
+
+
+def test_round_to_board_lot_floors_shares_and_recomputes_amount():
+    # 5,218.9 shares at an implied price of $13.9394/sh
+    trade = TradeInstruction(ticker="ZCS", action="BUY", dollar_amount=72750.81,
+                              shares_delta=5218.9, current_market_value=0.0,
+                              target_market_value=72750.81, new_weight=0.147)
+    rounded = round_to_board_lot(trade, portfolio_total=494903.0, lot_size=100)
+    assert rounded.shares_delta == 5200.0
+    price_used = 72750.81 / 5218.9
+    assert abs(rounded.dollar_amount - 5200 * price_used) < 1e-6
+    assert abs(rounded.target_market_value - 5200 * price_used) < 1e-6
+
+
+def test_round_to_board_lot_leaves_full_exit_sell_untouched():
+    """A full-position exit disposes of the whole position, including any
+    odd lot from DRIP reinvestment -- rounding it down would leave shares
+    unsold, contradicting "dispose in entirety"."""
+    trade = TradeInstruction(ticker="QHY", action="SELL", dollar_amount=72750.81,
+                              shares_delta=-904.6, current_market_value=72750.81,
+                              target_market_value=0.0, new_weight=0.0)
+    rounded = round_to_board_lot(trade, portfolio_total=494903.0, lot_size=100)
+    assert rounded is trade
+
+
+def test_round_to_board_lot_raises_when_trade_too_small():
+    trade = TradeInstruction(ticker="X", action="BUY", dollar_amount=500.0,
+                              shares_delta=50.0, current_market_value=0.0,
+                              target_market_value=500.0, new_weight=0.01)
+    try:
+        round_to_board_lot(trade, portfolio_total=50000.0, lot_size=100)
+        assert False, "expected ValueError"
+    except ValueError as e:
+        assert "50.0" in str(e)

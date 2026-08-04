@@ -49,7 +49,7 @@ from deck_automation.optimize import (  # noqa: E402
 )
 from deck_automation.patch.package import patch_metrics_refresh  # noqa: E402
 from deck_automation.position_value import current_price, current_values  # noqa: E402
-from deck_automation.rebalance import compute_full_exit_swap, compute_trades  # noqa: E402
+from deck_automation.rebalance import compute_full_exit_swap, compute_trades, round_to_board_lot  # noqa: E402
 from deck_automation.trade_blotter import TBD, build_blotter_row  # noqa: E402
 from deck_automation.render_qa import run_qa  # noqa: E402
 
@@ -217,7 +217,14 @@ def cmd_blotter(args) -> None:
                 print(f"Skipping {h.name}: no 'Target Weights: ...' text found on this deck")
                 continue
             values = current_values(portfolio_cost_basis, client_config["ticker_map"])
+            portfolio_total = sum(pv.market_value for pv in values.values())
             trades = compute_trades(values, target_weights)
+
+        if args.board_lot:
+            # A full-position exit (SELL to 0%) is left unrounded by design
+            # (see round_to_board_lot docstring) -- disposes of the whole
+            # position, odd lot included.
+            trades = [round_to_board_lot(t, portfolio_total, args.board_lot) for t in trades]
 
         rows = []
         for t in trades:
@@ -309,6 +316,11 @@ def main() -> None:
                                  "weights) or a path to a JSON file {portfolio_name: {ticker: "
                                  "weight}} for a manually-specified trade set (e.g. a strategic "
                                  "swap like Portfolio 1's QHY->ZCS)")
+            p.add_argument("--board-lot", type=int, default=None,
+                            help="Round each trade's share count DOWN to the nearest multiple "
+                                 "of this (e.g. 100, the standard TSX board lot). A full-position "
+                                 "exit (SELL to 0%%) is never rounded -- it disposes of the whole "
+                                 "position, odd lot included. Omit for no rounding.")
         p.set_defaults(func=fn)
 
     args = parser.parse_args()
