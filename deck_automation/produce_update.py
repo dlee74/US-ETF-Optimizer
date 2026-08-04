@@ -182,6 +182,7 @@ def cmd_blotter(args) -> None:
         manual_trades = json.loads(Path(args.trades_from).read_text(encoding="utf-8"))
 
     portfolios_docx = []
+    seen_watchpoint_tickers = set()  # a ticker traded in >1 portfolio (e.g. ZCS) gets one combined note, not a duplicate per portfolio
     for h in holdings:
         spec = None if manual_trades is None else manual_trades.get(h.name)
         if manual_trades is not None and spec is None:
@@ -244,8 +245,24 @@ def cmd_blotter(args) -> None:
                 limit_price_override=limit_price_override, order_type=order_type,
             ))
 
+        # "watchpoints": a top-level {TICKER: {"Current market considerations":
+        # str, "Execution guidance": str}} dict in the --trades-from JSON
+        # (sibling to the portfolio entries) -- narrative notes are always
+        # supplied by the caller (Claude, reviewing the actual computed
+        # trades), never generated here. Only tickers that actually appear
+        # in this portfolio's trades are included.
+        global_watchpoints = manual_trades.get("watchpoints", {}) if manual_trades else {}
+        watchpoints = []
+        for t in trades:
+            if t.ticker in seen_watchpoint_tickers:
+                continue
+            note = global_watchpoints.get(t.ticker)
+            if note:
+                watchpoints.append({"Ticker": t.ticker, **note})
+                seen_watchpoint_tickers.add(t.ticker)
+
         portfolio_label = next(p["slide_title"] for p in client_config["portfolios"] if p["name"] == h.name)
-        portfolios_docx.append({"heading": portfolio_label, "rows": rows, "watchpoints": []})
+        portfolios_docx.append({"heading": portfolio_label, "rows": rows, "watchpoints": watchpoints})
 
     if not portfolios_docx:
         raise SystemExit("No portfolios had trades to blotter — nothing to write.")
@@ -259,8 +276,14 @@ def cmd_blotter(args) -> None:
     if tbd_count:
         print(f"{tbd_count} row(s) have a TBD limit price — no confirmed formula for a "
               "partial trim/buy (see plan Phase 3). Advisor must set these manually.")
-    print("Ticker-Specific Watchpoints section is empty — add narrative notes by hand "
-          "after reviewing the computed trades (not auto-generated, by design).")
+    watched_tickers = sorted(seen_watchpoint_tickers)
+    all_traded_tickers = sorted({r["Ticker"] for p in portfolios_docx for r in p["rows"]})
+    missing_watchpoints = [t for t in all_traded_tickers if t not in seen_watchpoint_tickers]
+    if watched_tickers:
+        print(f"Watchpoints included for: {', '.join(watched_tickers)}")
+    if missing_watchpoints:
+        print(f"No watchpoints given for: {', '.join(missing_watchpoints)} — add narrative "
+              "notes by hand if warranted (not auto-generated, by design).")
 
 
 def main() -> None:
