@@ -104,15 +104,31 @@ def recent_range(ticker: str, as_of_date: str, months: int = 9) -> tuple[float, 
 
 def build_blotter_row(trade, fetchable_ticker: str, as_of_date: str,
                        limit_price_method: str | None = None,
-                       purchase_date: str | None = None) -> dict:
+                       purchase_date: str | None = None,
+                       limit_price_override: str | None = None,
+                       order_type: str = "Day") -> dict:
     """trade: a rebalance.TradeInstruction (holds the BARE display ticker,
     e.g. "HDIV"). fetchable_ticker: the yfinance-fetchable form (e.g.
     "HDIV.TO", from client_config["ticker_map"]) — trade.ticker itself is
-    never passed to yfinance. limit_price_method: None (TBD), "full_exit"
-    (needs purchase_date), or "last_close". Never guesses — an
-    unrecognized/unsupported method raises rather than silently falling
-    back to TBD, so a typo doesn't quietly produce a placeholder."""
-    if limit_price_method is None:
+    never passed to yfinance.
+
+    limit_price_override: an advisor-supplied price (e.g. from direct
+    instruction, not computed) — takes precedence over limit_price_method
+    entirely when given, since a human-specified value for a live order is
+    more authoritative than any formula here.
+
+    limit_price_method (only consulted when no override is given): None
+    (TBD), "full_exit" (needs purchase_date), or "last_close". Never
+    guesses — an unrecognized/unsupported method raises rather than
+    silently falling back to TBD, so a typo doesn't quietly produce a
+    placeholder.
+
+    order_type: e.g. "Day" or "Standing (1 month)" — always advisor-
+    supplied, never inferred; defaults to "Day" (this deck's own baseline
+    execution protocol) when not specified."""
+    if limit_price_override is not None:
+        limit_price = limit_price_override
+    elif limit_price_method is None:
         limit_price = TBD
     elif limit_price_method == "full_exit":
         if purchase_date is None:
@@ -134,6 +150,7 @@ def build_blotter_row(trade, fetchable_ticker: str, as_of_date: str,
     return {
         "Ticker": trade.ticker,
         "Action": trade.action,
+        "Order Type": order_type,
         "Shares": shares_display,
         "Amount": f"${trade.dollar_amount:,.2f}",
         "Limit Price": f"${limit_price}" if limit_price != TBD else TBD,

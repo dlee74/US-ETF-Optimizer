@@ -190,7 +190,13 @@ def cmd_blotter(args) -> None:
         portfolio_cost_basis = {t: client_config["cost_basis"][t] for t in h.tickers}
         print(f"Computing trades for {h.name} ...")
 
-        if isinstance(spec, dict) and spec.get("type") == "swap":
+        # "overrides": {TICKER: {"order_type": str, "limit_price": str}} --
+        # advisor-supplied values, always take precedence over anything
+        # computed. Optional sibling key alongside either spec shape below.
+        overrides = spec.get("overrides", {}) if isinstance(spec, dict) else {}
+        is_swap = isinstance(spec, dict) and spec.get("type") == "swap"
+
+        if is_swap:
             # A standing order to dispose of one holding entirely and buy a
             # replacement with the exact proceeds — NOT a full rebalance;
             # every other ticker in the portfolio is left untouched.
@@ -202,7 +208,10 @@ def cmd_blotter(args) -> None:
                 all_values[sell_ticker], buy_ticker, buy_price, portfolio_total)
             trades = [sell_trade, buy_trade]
         else:
-            target_weights = h.target_weights if spec is None else spec
+            if spec is None:
+                target_weights = h.target_weights
+            else:
+                target_weights = {t: w for t, w in spec.items() if t not in ("type", "overrides")}
             if target_weights is None:
                 print(f"Skipping {h.name}: no 'Target Weights: ...' text found on this deck")
                 continue
@@ -211,13 +220,19 @@ def cmd_blotter(args) -> None:
 
         rows = []
         for t in trades:
-            # Only apply a confirmed limit-price convention: full_exit for a
-            # complete exit (new_weight == 0), "last_close" for a fresh buy
-            # into a swap's replacement ticker (confirmed exact for ZCS
-            # specifically — see plan Phase 3), never a guessed formula for
-            # a partial trim/buy — those come back TBD.
-            is_swap = isinstance(spec, dict) and spec.get("type") == "swap"
-            if t.new_weight == 0:
+            override = overrides.get(t.ticker, {})
+            order_type = override.get("order_type", "Day")
+            limit_price_override = override.get("limit_price")
+
+            # Only apply a confirmed limit-price FORMULA when no override was
+            # given: full_exit for a complete exit (new_weight == 0),
+            # "last_close" for a fresh buy into a swap's replacement ticker
+            # (confirmed exact for ZCS specifically — see plan Phase 3),
+            # never a guessed formula for a partial trim/buy — those come
+            # back TBD unless the advisor supplied a limit_price override.
+            if limit_price_override is not None:
+                method, purchase_date = None, None
+            elif t.new_weight == 0:
                 method, purchase_date = "full_exit", client_config["cost_basis"][t.ticker].get("purchase_date")
             elif is_swap and t.action == "BUY":
                 method, purchase_date = "last_close", None
@@ -226,6 +241,7 @@ def cmd_blotter(args) -> None:
             rows.append(build_blotter_row(
                 t, client_config["ticker_map"][t.ticker], args.as_of_date,
                 limit_price_method=method, purchase_date=purchase_date,
+                limit_price_override=limit_price_override, order_type=order_type,
             ))
 
         portfolio_label = next(p["slide_title"] for p in client_config["portfolios"] if p["name"] == h.name)

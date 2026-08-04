@@ -60,7 +60,7 @@ DISCLAIMER = (
     "registered investment advisor or broker, as applicable."
 )
 
-TRADE_TABLE_COLUMNS = ["Ticker", "Action", "Shares", "Amount", "Limit Price",
+TRADE_TABLE_COLUMNS = ["Ticker", "Action", "Order Type", "Shares", "Amount", "Limit Price",
                         "Recent Range (~9 mo)", "New Weight"]
 WATCHPOINTS_COLUMNS = ["Ticker", "Current market considerations", "Execution guidance"]
 
