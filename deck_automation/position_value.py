@@ -75,3 +75,16 @@ def current_values(cost_basis: dict, ticker_map: dict) -> dict[str, PositionValu
             unrealized_gain=market_value - book_cost,
         )
     return results
+
+
+def current_price(fetchable_ticker: str) -> float:
+    """A single ticker's current price, no cost-basis/existing-position
+    required — for pricing a fresh buy into a ticker the portfolio doesn't
+    currently hold (see rebalance.compute_full_exit_swap())."""
+    prices_df = fetch_prices([fetchable_ticker], period="5d")
+    if prices_df.empty or fetchable_ticker not in prices_df.columns:
+        raise ValueError(f"No current price available for {fetchable_ticker}")
+    col = prices_df[fetchable_ticker].dropna()
+    if col.empty:
+        raise ValueError(f"No current price available for {fetchable_ticker}")
+    return float(col.iloc[-1])

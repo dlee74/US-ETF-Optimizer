@@ -48,8 +48,8 @@ from deck_automation.optimize import (  # noqa: E402
     build_reoptimization_table, optimize_holdings, refresh_metrics_at_target,
 )
 from deck_automation.patch.package import patch_metrics_refresh  # noqa: E402
-from deck_automation.position_value import current_values  # noqa: E402
-from deck_automation.rebalance import compute_trades  # noqa: E402
+from deck_automation.position_value import current_price, current_values  # noqa: E402
+from deck_automation.rebalance import compute_full_exit_swap, compute_trades  # noqa: E402
 from deck_automation.trade_blotter import TBD, build_blotter_row  # noqa: E402
 from deck_automation.render_qa import run_qa  # noqa: E402
 
@@ -183,29 +183,46 @@ def cmd_blotter(args) -> None:
 
     portfolios_docx = []
     for h in holdings:
-        if manual_trades is None:
-            if h.target_weights is None:
+        spec = None if manual_trades is None else manual_trades.get(h.name)
+        if manual_trades is not None and spec is None:
+            continue
+
+        portfolio_cost_basis = {t: client_config["cost_basis"][t] for t in h.tickers}
+        print(f"Computing trades for {h.name} ...")
+
+        if isinstance(spec, dict) and spec.get("type") == "swap":
+            # A standing order to dispose of one holding entirely and buy a
+            # replacement with the exact proceeds — NOT a full rebalance;
+            # every other ticker in the portfolio is left untouched.
+            sell_ticker, buy_ticker = spec["sell"], spec["buy"]
+            all_values = current_values(portfolio_cost_basis, client_config["ticker_map"])
+            portfolio_total = sum(pv.market_value for pv in all_values.values())
+            buy_price = current_price(client_config["ticker_map"][buy_ticker])
+            sell_trade, buy_trade = compute_full_exit_swap(
+                all_values[sell_ticker], buy_ticker, buy_price, portfolio_total)
+            trades = [sell_trade, buy_trade]
+        else:
+            target_weights = h.target_weights if spec is None else spec
+            if target_weights is None:
                 print(f"Skipping {h.name}: no 'Target Weights: ...' text found on this deck")
                 continue
-            target_weights = h.target_weights
-        else:
-            if h.name not in manual_trades:
-                continue
-            target_weights = manual_trades[h.name]
-
-        print(f"Computing trades for {h.name} ...")
-        portfolio_cost_basis = {t: client_config["cost_basis"][t] for t in h.tickers}
-        values = current_values(portfolio_cost_basis, client_config["ticker_map"])
-        trades = compute_trades(values, target_weights)
+            values = current_values(portfolio_cost_basis, client_config["ticker_map"])
+            trades = compute_trades(values, target_weights)
 
         rows = []
         for t in trades:
             # Only apply a confirmed limit-price convention: full_exit for a
-            # complete exit (new_weight == 0), never a guessed formula for
-            # partial trims/buys — those come back TBD (see plan Phase 3).
-            method = "full_exit" if t.new_weight == 0 else None
-            purchase_date = (client_config["cost_basis"][t.ticker].get("purchase_date")
-                              if method == "full_exit" else None)
+            # complete exit (new_weight == 0), "last_close" for a fresh buy
+            # into a swap's replacement ticker (confirmed exact for ZCS
+            # specifically — see plan Phase 3), never a guessed formula for
+            # a partial trim/buy — those come back TBD.
+            is_swap = isinstance(spec, dict) and spec.get("type") == "swap"
+            if t.new_weight == 0:
+                method, purchase_date = "full_exit", client_config["cost_basis"][t.ticker].get("purchase_date")
+            elif is_swap and t.action == "BUY":
+                method, purchase_date = "last_close", None
+            else:
+                method, purchase_date = None, None
             rows.append(build_blotter_row(
                 t, client_config["ticker_map"][t.ticker], args.as_of_date,
                 limit_price_method=method, purchase_date=purchase_date,

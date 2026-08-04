@@ -55,3 +55,33 @@ def compute_trades(current_values: dict, target_weights: dict) -> list[TradeInst
             new_weight=target_weights[ticker],
         ))
     return trades
+
+
+def compute_full_exit_swap(sell_position, buy_ticker: str, buy_price: float,
+                            portfolio_total_value: float) -> tuple[TradeInstruction, TradeInstruction]:
+    """A standing order: dispose of sell_position entirely, then buy
+    buy_ticker with the exact proceeds once that's done (matches slide 7's
+    real precedent — QHY sold for $73,082.63, ZCS bought with that exact
+    $73,082.63, not an independently-sized amount). Every other holding in
+    the portfolio is untouched — this is NOT a full rebalance, just a
+    targeted swap of one position for another.
+
+    sell_position: a position_value.PositionValue for the ticker being
+    exited. buy_price: buy_ticker's current price (it may not have an
+    existing position/cost-basis entry in this portfolio at all — that's
+    the point). portfolio_total_value: the WHOLE portfolio's current value
+    (all holdings, not just this pair) — used only to compute the buy
+    trade's resulting weight for display."""
+    proceeds = sell_position.market_value
+
+    sell_trade = TradeInstruction(
+        ticker=sell_position.ticker, action="SELL", dollar_amount=proceeds,
+        shares_delta=-sell_position.shares, current_market_value=sell_position.market_value,
+        target_market_value=0.0, new_weight=0.0,
+    )
+    buy_trade = TradeInstruction(
+        ticker=buy_ticker, action="BUY", dollar_amount=proceeds,
+        shares_delta=proceeds / buy_price, current_market_value=0.0,
+        target_market_value=proceeds, new_weight=proceeds / portfolio_total_value,
+    )
+    return sell_trade, buy_trade
