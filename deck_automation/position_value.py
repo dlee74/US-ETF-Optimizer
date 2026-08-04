@@ -49,14 +49,20 @@ def current_values(cost_basis: dict, ticker_map: dict) -> dict[str, PositionValu
     prices_df = fetch_prices(fetchable, period="5d")
     if prices_df.empty:
         raise ValueError("fetch_prices returned no data for any ticker")
-    latest = prices_df.iloc[-1]
 
     results = {}
     for ticker in bare_tickers:
         fetchable_ticker = ticker_map[ticker]
-        if fetchable_ticker not in latest.index or pd.isna(latest[fetchable_ticker]):
+        if fetchable_ticker not in prices_df.columns:
             raise ValueError(f"No current price available for {ticker} ({fetchable_ticker})")
-        price = float(latest[fetchable_ticker])
+        # Each ticker's OWN most recent non-NaN close, not the DataFrame's
+        # last row — thinner ETFs can lag a day behind more liquid ones in
+        # having their latest bar populated, so requiring one shared "most
+        # recent" date across all tickers fails on those lagging names.
+        col = prices_df[fetchable_ticker].dropna()
+        if col.empty:
+            raise ValueError(f"No current price available for {ticker} ({fetchable_ticker})")
+        price = float(col.iloc[-1])
         shares = cost_basis[ticker]["shares"]
         book_cost = cost_basis[ticker]["book_cost"]
         market_value = price * shares
