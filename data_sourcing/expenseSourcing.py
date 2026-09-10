@@ -1,8 +1,15 @@
+import os
 import pandas as pd
 import requests
 import time
 from pathlib import Path
-API_KEY       = "803XLKxBBpvAPdZvJQ1HOck4WnrRNdTl"   # <-- your FMP key, keep the quotes
+
+# FMP API key comes from the environment, never a committed literal.
+# Set it before running, e.g. in PowerShell:  $env:FMP_API_KEY = "your-key"
+# (or put FMP_API_KEY in a .env you never commit). When unset it stays the
+# PASTE_YOUR_KEY_HERE sentinel below, which disables the FMP call path and
+# the script falls back to yfinance.
+API_KEY       = os.environ.get("FMP_API_KEY", "PASTE_YOUR_KEY_HERE")
 INPUT_FILE    = "US_Final_ETF_Data.csv"           # <-- your file (.csv or .xlsx)
 TICKER_COLUMN = "Symbol"                # <-- the column that holds the tickers
 
